@@ -355,27 +355,84 @@ class randtermFrame(wx.Frame, Thread):
         # Setup the defaults
         self.readDefaults()
 
-        # Serial Output Area
+        class Texter:
+            def __init__(self, parent):
+                self.parent = parent
+                self.sizer = wx.GridBagSizer(2, 10)
+                
+                class Base:
+                    def __init__(self, parent, isEnabled):
+                        self.parent = parent
+                        self.enable = wx.CheckBox(parent)
+                        
+                        font = wx.Font(10, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+                        self.sheet  = wx.TextCtrl(parent, style = wx.TE_MULTILINE | wx.TE_READONLY)
+                        self.sheet.SetFont(font)
+                
+                class Asciier(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        Base.__init__(self, parent, True)
+                self.asciier = Asciier(parent)
+                self.sizer.Add(self.asciier.enable, pos = (0, 0), flag = wx.EXPAND)
+                self.sizer.Add(self.asciier.sheet, pos = (1, 0), span = (1, 7), flag = wx.EXPAND)
+
+                class Decimaler(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        Base.__init__(self, parent, False)
+                self.decimaler = Decimaler(parent)
+                self.sizer.Add(self.decimaler.enable, pos = (0, 7), flag = wx.EXPAND)
+                self.sizer.Add(self.decimaler.sheet, pos = (1, 7), flag = wx.EXPAND)
+
+                class Hexadecimaler(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        Base.__init__(self, parent, False)
+                self.hexadecimaler = Hexadecimaler(parent)
+                self.sizer.Add(self.hexadecimaler.enable, pos = (0, 8), flag = wx.EXPAND)
+                self.sizer.Add(self.hexadecimaler.sheet, pos = (1, 8), flag = wx.EXPAND)
+
+                class Binarier(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        Base.__init__(self, parent, False)
+                self.binarier = Binarier(parent)
+                self.sizer.Add(self.binarier.enable, pos = (0, 9), flag = wx.EXPAND)
+                self.sizer.Add(self.binarier.sheet, pos = (1, 9), flag = wx.EXPAND)
+                
+                self.sizer.AddGrowableRow(1)
+                self.sizer.AddGrowableCol(0)
+
         outputSizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.outer = Texter(self)
+        outputSizer.Add(self.outer.sizer, 2, wx.EXPAND)
+
+        self.inner = Texter(self)
+        outputSizer.Add(self.inner.sizer, 1, wx.EXPAND)
+            
+        
+        # Serial Output Area
         ## Output Type
-        topSizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.displayTypeRadios = wx.RadioBox(self, wx.ID_ANY,
-                                             style = wx.RA_HORIZONTAL, 
-                                             label="RX Format", 
-                                             choices = ('Ascii', 'Decimal', 
-                                                        'Hex', 'Binary'))
-        self.Bind(wx.EVT_RADIOBOX, self.OnChangeDisplay, self.displayTypeRadios)
-        topSizer.Add(self.displayTypeRadios, 0)
-        self.clearOutputButton = wx.Button(self, id=wx.ID_ANY, label="Clear")
-        self.Bind(wx.EVT_BUTTON, self.OnClearOutput, self.clearOutputButton)
-        topSizer.AddStretchSpacer()
-        topSizer.Add(self.clearOutputButton, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT )
-        outputSizer.Add(topSizer, flag=wx.EXPAND)
-        ## Output Area
-        serialFont = wx.Font(10, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-        self.serialOutput = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY)
-        self.serialOutput.SetFont(serialFont)
-        outputSizer.Add(self.serialOutput, 1, wx.EXPAND)
+#         topSizer = wx.BoxSizer(wx.HORIZONTAL)
+#         self.displayTypeRadios = wx.RadioBox(self, wx.ID_ANY,
+#                                              style = wx.RA_HORIZONTAL, 
+#                                              label="RX Format", 
+#                                              choices = ('Ascii', 'Decimal', 
+#                                                         'Hex', 'Binary'))
+#         self.Bind(wx.EVT_RADIOBOX, self.OnChangeDisplay, self.displayTypeRadios)
+#         topSizer.Add(self.displayTypeRadios, 0)
+#         self.clearOutputButton = wx.Button(self, id=wx.ID_ANY, label="Clear")
+#         self.Bind(wx.EVT_BUTTON, self.OnClearOutput, self.clearOutputButton)
+#         topSizer.AddStretchSpacer()
+#         topSizer.Add(self.clearOutputButton, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT )
+#         outputSizer.Add(topSizer, flag=wx.EXPAND)
+#         ## Output Area
+#         serialFont = wx.Font(10, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+#         self.serialOutput = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY)
+#         self.serialOutput.SetFont(serialFont)
+#         outputSizer.Add(self.serialOutput, 1, wx.EXPAND)
         mainSizer.Add(outputSizer, 1, wx.EXPAND)
         # Input Area
         lowerAreaSizer = wx.BoxSizer(wx.VERTICAL)
@@ -384,7 +441,7 @@ class randtermFrame(wx.Frame, Thread):
         lowerAreaSizer.Add(liveTypeSizer)
         liveTypeSizer.Add(wx.StaticText(self, wx.ID_ANY, " LiveType: "))
         self.liveType = wx.TextCtrl(self, wx.ID_ANY, '',
-                                                                style=wx.TE_LEFT|wx.TE_MULTILINE|wx.TE_RICH, size=(160,25))
+                                    style=wx.TE_LEFT|wx.TE_MULTILINE|wx.TE_RICH, size=(160,25))
         liveTypeSizer.Add(self.liveType)
         self.Bind(wx.EVT_TEXT, self.OnSendLiveType, self.liveType)
         ## Input Array
