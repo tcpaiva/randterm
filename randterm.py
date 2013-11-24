@@ -1,26 +1,36 @@
 #!/usr/bin/env python
 
-#    Copyright 2010 Randolph C Voorhies
-#    http://ilab.usc.edu/~rand
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
+#  Copyright 2010 Randolph C Voorhies
+#  http://ilab.usc.edu/~rand
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
 #
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
-#    GNU General Public License for more details.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+#  GNU General Public License for more details.
 #
-#    You should have received a copy of the GNU General Public License
-#    along with this program.    If not, see <http://www.gnu.org/licenses/>.
+#  You should have received a copy of the GNU General Public License
+#  along with this program.    If not, see <http://www.gnu.org/licenses/>.
 
 import wx
+import wx.combo
+
 import serial
 import threading
 from threading import Thread
 import time
+import os
+from serial.tools import list_ports
 
+
+class Style:
+    def __init__(self):
+        self.rx = wx.TextAttr(colText = wx.Colour(100, 0, 0))
+        self.tx = wx.TextAttr(colText = wx.Colour(0, 0, 100))
+style = Style()
 
 rxStyle = wx.TextAttr(
     colText = wx.Colour(100, 0, 0)
@@ -36,9 +46,9 @@ parityMap = {
 }
 
 stopMap = {
-    '1':     serial.STOPBITS_ONE,
+    '1':   serial.STOPBITS_ONE,
     '1.5': serial.STOPBITS_ONE_POINT_FIVE,
-    '2':     serial.STOPBITS_TWO
+    '2':   serial.STOPBITS_TWO
 }
 
 bytesizeMap = {
@@ -55,19 +65,22 @@ class randtermFrame(wx.Frame, Thread):
         Thread.__init__(self)
         wx.Frame.__init__(self, parent, title=title, size=(600, 400))
 
-        self.cfg = wx.Config('randterm')
+        self.cfg = wx.Config('randtermrc')
 
         self.historyLock = threading.Lock()
         self.history = []
 
         self.Bind(wx.EVT_ACTIVATE, self.OnActivate)
 
+        # Main Window
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
 
         self.CreateStatusBar()
+        
         # File Menu
         fileMenu = wx.Menu()
-        menuAbout = fileMenu.Append(wx.ID_ABOUT, "&About", 
-                                                                " Information about randterm")
+        menuAbout = fileMenu.Append(wx.ID_ABOUT, "&About",
+                                    " Information about randterm")
         self.Bind(wx.EVT_MENU, self.OnAbout, menuAbout)
         menuExit = fileMenu.Append(wx.ID_EXIT, "E&xit", " Exit")
         self.Bind(wx.EVT_MENU, self.OnExit, menuExit)
@@ -123,6 +136,213 @@ class randtermFrame(wx.Frame, Thread):
         closeConnection = self.connectMenu.Append(
             wx.ID_ANY, '&Close Connection', 'Close Connection')
         self.Bind(wx.EVT_MENU, self.OnCloseConnection, closeConnection)
+        
+        
+        class SerialPort:
+            def __init__(self, parent):
+                self.parent = parent
+                self.sizer = wx.GridBagSizer(2, 5)
+                
+                class Base():
+                    def __init__(self, parent, name, choices):
+                        self.parent = parent
+                        self.name = wx.StaticText(parent, label = name)
+                        if choices != []:
+                            self.values = wx.ComboBox(parent, value = choices[0], choices = choices)
+                        else:
+                            self.values = wx.ComboBox(parent, choices = choices)
+                        dc = wx.ClientDC(parent)
+                        if choices != []:
+                            tsize = max((dc.GetTextExtent (c)[0] for c in choices)) 
+                            self.values.SetMinSize((tsize + 25, -1))
+                        else:
+                            self.values.SetMinSize((50, -1))
+              
+                # serial port
+                class PortPath(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        Base.__init__(self, parent, "Port Path", [])
+#                         super(PortPath, self).__init__(parent, "Port Path", [''])
+#                         self.Bind(wx.EVT_COMBOBOX, self.OnListClick, self.values)
+
+                    def OnListClick(self):
+                        """
+                        Returns a generator for all available serial ports
+                        """
+                        self.values.Clear()
+                        # windows
+                        if os.name == 'nt':
+                            for i in range(256):
+                                try:
+                                    s = serial.Serial(i)
+                                    s.close()
+                                    self.values.Append('COM' + str(i + 1))
+                                except serial.SerialException:
+                                    pass
+                        # unix
+                        else:
+                            for i in list_ports.comports():
+                                    self.values.Append(str(i))
+
+                self.portPath = PortPath(parent) 
+
+                # baud rate
+                class BaudRate(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        self.map = {}
+                        self.map[  '2400'] =   2400
+                        self.map[  '4800'] =   4800
+                        self.map[  '9600'] =   9600
+                        self.map[ '19200'] =  19200
+                        self.map[ '38400'] =  38400
+                        self.map[ '57600'] =  57600
+                        self.map['115200'] = 115200
+                        self.map['312500'] = 312500 
+                        self.map['Custom'] = None
+                        Base.__init__(self, parent, "BaudRate", self.map.keys())
+#                         super(BaudRate, self).__init__(parent, "BaudRate", self.map.keys())
+                self.baudRate = BaudRate(parent) 
+
+                # parity
+                class Parity(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        self.map = {}
+                        self.map[ 'None'] = serial.PARITY_NONE
+                        self.map[  'Odd'] = serial.PARITY_ODD
+                        self.map[ 'Even'] = serial.PARITY_EVEN
+                        self.map[ 'Mark'] = serial.PARITY_MARK
+                        self.map['Space'] = serial.PARITY_SPACE
+                        Base.__init__(self, parent, "Parity", self.map.keys())
+#                         super(Parity, self).__init__(parent, "Parity", self.map.keys())
+                self.parity = Parity(parent) 
+
+                # word bits
+                class Bits(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        self.map = {}
+                        self.map['5'] = serial.FIVEBITS
+                        self.map['6'] = serial.SIXBITS
+                        self.map['7'] = serial.SEVENBITS
+                        self.map['8'] = serial.EIGHTBITS
+                        Base.__init__(self, parent, "Word bits", self.map.keys())
+#                         super(Bits, self).__init__(parent, "Word bits", self.map.keys())
+                self.wordBits = Bits(parent) 
+
+                # stop bits
+                class StopBits(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        self.map = {}
+                        self.map['1']   = serial.STOPBITS_ONE
+                        self.map['1.5'] = serial.STOPBITS_ONE_POINT_FIVE
+                        self.map['2']   = serial.STOPBITS_TWO
+                        Base.__init__(self, parent, "Stop bits", self.map.keys())
+#                         super(StopBits, self).__init__(parent, "Stop bits", self.map.keys())
+                self.stopBits = StopBits(parent) 
+
+                # flow control
+                class FlowControl(Base):
+                    def __init__(self, parent):
+                        self.parent = parent
+                        self.map = ['None', 'Xon/Xoff', 'RTS/CTS', 'DSR/DTR']
+                        Base.__init__(self, parent, "Flow control", self.map)
+#                         super(FlowControl, self).__init__(parent, "Flow control", self.map.keys())
+                self.flowControl = FlowControl(parent) 
+
+                # connecting
+                class Connector:
+                    def __init__(self, parent):
+                        self.parent = parent
+                        self.toggle = wx.Button(parent, id = wx.ID_ANY, label = "Connect")
+                        parent.Bind(wx.EVT_BUTTON, self.OnToggle, self.toggle)
+                        self.isConnected = False
+
+                    def OnToggle(self):
+                        if(self.connected):
+                            self.Close(None)
+                        else:
+                            self.Open(None)
+
+                    def Open(self):
+                        pass
+#                         if self.portName == "":
+#                             self.OnSetPort(None)
+#                             return
+#                  
+#                         baudRadio     = None
+#                         for b in self.baudRadios:     
+#                             if b.IsChecked(): baudRadio     = b
+#                         parityRadio = None
+#                         for p in self.parityRadios:
+#                             if p.IsChecked(): parityRadio = p
+#                         byteRadio     = None
+#                         for b in self.byteRadios:
+#                             if b.IsChecked(): byteRadio     = b
+#                         stopRadio     = None
+#                         for s in self.stopbitsRadios:
+#                             if s.IsChecked(): stopRadio     = s
+#                 
+#                         self.serialCon = serial.Serial()
+#                         self.serialCon.port         = self.portName
+#                         self.serialCon.baudrate = int(baudRadio.GetLabel())
+#                         self.serialCon.bytesize = bytesizeMap[byteRadio.GetLabel()]
+#                         self.serialCon.parity     = parityMap[parityRadio.GetLabel()]
+#                         self.serialCon.stopbits = stopMap[stopRadio.GetLabel()]
+#                         self.serialCon.xonxoff    = self.xonoffCheck.IsChecked()
+#                         self.serialCon.rtscts     = self.rtsctsCheck.IsChecked()
+#                         self.serialCon.dsrdtr     = self.dsrdtrCheck.IsChecked()
+#                         self.serialCon.timeout    = .3
+#                 
+#                         self.cfg.Write('portname', self.portName)
+#                         self.cfg.Write('baud',         baudRadio.GetLabel())
+#                         self.cfg.Write('parity',     parityRadio.GetLabel())
+#                         self.cfg.Write('bytesize', byteRadio.GetLabel())
+#                         self.cfg.Write('stopbits', stopRadio.GetLabel())
+#                         for item in self.flowMenu.GetMenuItems():
+#                             self.cfg.WriteBool(item.GetLabel(),item.IsChecked())
+#                 
+#                         try:
+#                             self.serialCon.open()
+#                         except serial.SerialException as ex:
+#                             self.autoDisconnectCheck.SetValue(False)
+#                             wx.MessageDialog(None, str(ex), 'Serial Error', wx.OK | wx.ICON_ERROR).ShowModal()
+#                             self.SetStatusText('Not Connected...')
+#                             self.connected = False
+#                             return
+#                 
+#                         self.SetStatusText('Connected to ' + self.portName + ' ' + baudRadio.GetLabel() + 'bps')
+#                         self.connected = True
+#                         self.connectButton.SetBackgroundColour(wx.Colour(0, 255, 0))
+#                         self.connectButton.SetLabel("Disconnect")
+                self.connector = Connector(parent) 
+
+
+                self.sizer.Add(self.portPath.name     , pos = (0, 0), flag = wx.LEFT|wx.TOP   |wx.EXPAND, border = 5)
+                self.sizer.Add(self.portPath.values   , pos = (1, 0), flag = wx.LEFT|wx.BOTTOM|wx.EXPAND, border = 5)
+                self.sizer.Add(self.baudRate.name     , pos = (0, 1), flag = wx.LEFT|wx.TOP   |wx.EXPAND, border = 5)
+                self.sizer.Add(self.baudRate.values   , pos = (1, 1), flag = wx.LEFT|wx.BOTTOM|wx.EXPAND, border = 5)
+                self.sizer.Add(self.parity.name       , pos = (0, 2), flag = wx.LEFT|wx.TOP   |wx.EXPAND, border = 5)
+                self.sizer.Add(self.parity.values     , pos = (1, 2), flag = wx.LEFT|wx.BOTTOM|wx.EXPAND, border = 5)
+                self.sizer.Add(self.wordBits.name     , pos = (0, 3), flag = wx.LEFT|wx.TOP   |wx.EXPAND, border = 5)
+                self.sizer.Add(self.wordBits.values   , pos = (1, 3), flag = wx.LEFT|wx.BOTTOM|wx.EXPAND, border = 5)
+                self.sizer.Add(self.stopBits.name     , pos = (0, 4), flag = wx.LEFT|wx.TOP   |wx.EXPAND, border = 5)
+                self.sizer.Add(self.stopBits.values   , pos = (1, 4), flag = wx.LEFT|wx.BOTTOM|wx.EXPAND, border = 5)
+                self.sizer.Add(self.flowControl.name  , pos = (0, 5), flag = wx.LEFT|wx.TOP   |wx.EXPAND, border = 5)
+                self.sizer.Add(self.flowControl.values, pos = (1, 5), flag = wx.LEFT|wx.BOTTOM|wx.EXPAND, border = 5)
+                self.sizer.Add(self.connector.toggle  , pos = (1, 6), flag = wx.LEFT|wx.BOTTOM|wx.EXPAND, border = 5)
+#                 connectButtonSizer.Add(self.connectButton)
+                
+        self.serialPort = SerialPort(self)
+
+        
+        mainSizer.Add(self.serialPort.sizer, proportion = 0, flag = wx.ALL, border = 5)
+        
+        
+        
         # Menu Bar
         menuBar = wx.MenuBar()
         menuBar.Append(fileMenu,        "&File")
@@ -132,15 +352,15 @@ class randtermFrame(wx.Frame, Thread):
         # Setup the defaults
         self.readDefaults()
 
-        # Main Window
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
         # Serial Output Area
         outputSizer = wx.BoxSizer(wx.VERTICAL)
         ## Output Type
         topSizer = wx.BoxSizer(wx.HORIZONTAL)
         self.displayTypeRadios = wx.RadioBox(self, wx.ID_ANY,
-                                                                             style=wx.RA_HORIZONTAL, label="RX Format",
-                                                                             choices = ('Ascii', 'Decimal', 'Hex', 'Binary'))
+                                             style = wx.RA_HORIZONTAL, 
+                                             label="RX Format", 
+                                             choices = ('Ascii', 'Decimal', 
+                                                        'Hex', 'Binary'))
         self.Bind(wx.EVT_RADIOBOX, self.OnChangeDisplay, self.displayTypeRadios)
         topSizer.Add(self.displayTypeRadios, 0)
         self.clearOutputButton = wx.Button(self, id=wx.ID_ANY, label="Clear")
