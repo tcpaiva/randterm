@@ -20,11 +20,11 @@ import wx.combo
 
 import serial
 import threading
-from threading import Thread
 import time
 import os
+from threading    import Thread
 from serial.tools import list_ports
-
+from collections  import OrderedDict
 
 class Style:
     def __init__(self):
@@ -144,17 +144,20 @@ class randtermFrame(wx.Frame, Thread):
                 self.sizer = wx.GridBagSizer(2, 5)
                 
                 class Base():
-                    def __init__(self, parent, name, choices):
+                    def __init__(self, parent, name, choices, editable = True):
                         self.parent = parent
+#                         choices = sorted(choices)
+#                         choices.sort(key=int)
                         self.name = wx.StaticText(parent, label = name)
-                        if choices != []:
-                            self.values = wx.ComboBox(parent, value = choices[0], choices = choices)
-                        else:
+                        if editable == True:
                             self.values = wx.ComboBox(parent, choices = choices)
+                        else: 
+                            self.values = wx.ComboBox(parent, choices = choices, style = wx.CB_READONLY)
                         dc = wx.ClientDC(parent)
                         if choices != []:
+                            self.values.SetValue(choices[0])
                             tsize = max((dc.GetTextExtent (c)[0] for c in choices)) 
-                            self.values.SetMinSize((tsize + 25, -1))
+                            self.values.SetMinSize((tsize + 50, -1))
                         else:
                             self.values.SetMinSize((50, -1))
               
@@ -162,9 +165,9 @@ class randtermFrame(wx.Frame, Thread):
                 class PortPath(Base):
                     def __init__(self, parent):
                         self.parent = parent
-                        Base.__init__(self, parent, "Port Path", [])
+                        Base.__init__(self, parent, "Port Path", [], False)
 #                         super(PortPath, self).__init__(parent, "Port Path", [''])
-#                         self.Bind(wx.EVT_COMBOBOX, self.OnListClick, self.values)
+                        self.values.Bind(wx.EVT_COMBOBOX, self.OnListClick)
 
                     def OnListClick(self):
                         """
@@ -191,7 +194,7 @@ class randtermFrame(wx.Frame, Thread):
                 class BaudRate(Base):
                     def __init__(self, parent):
                         self.parent = parent
-                        self.map = {}
+                        self.map = OrderedDict({})
                         self.map[  '2400'] =   2400
                         self.map[  '4800'] =   4800
                         self.map[  '9600'] =   9600
@@ -209,7 +212,7 @@ class randtermFrame(wx.Frame, Thread):
                 class Parity(Base):
                     def __init__(self, parent):
                         self.parent = parent
-                        self.map = {}
+                        self.map = OrderedDict({})
                         self.map[ 'None'] = serial.PARITY_NONE
                         self.map[  'Odd'] = serial.PARITY_ODD
                         self.map[ 'Even'] = serial.PARITY_EVEN
@@ -223,7 +226,7 @@ class randtermFrame(wx.Frame, Thread):
                 class Bits(Base):
                     def __init__(self, parent):
                         self.parent = parent
-                        self.map = {}
+                        self.map = OrderedDict({})
                         self.map['5'] = serial.FIVEBITS
                         self.map['6'] = serial.SIXBITS
                         self.map['7'] = serial.SEVENBITS
@@ -236,7 +239,7 @@ class randtermFrame(wx.Frame, Thread):
                 class StopBits(Base):
                     def __init__(self, parent):
                         self.parent = parent
-                        self.map = {}
+                        self.map = OrderedDict({})
                         self.map['1']   = serial.STOPBITS_ONE
                         self.map['1.5'] = serial.STOPBITS_ONE_POINT_FIVE
                         self.map['2']   = serial.STOPBITS_TWO
