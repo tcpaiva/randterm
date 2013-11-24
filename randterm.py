@@ -411,7 +411,39 @@ class randtermFrame(wx.Frame, Thread):
 
         self.inner = Texter(self)
         outputSizer.Add(self.inner.sizer, 1, wx.EXPAND)
-            
+        
+        class Sender:
+            def __init__(self, parent):
+                self.parent     = parent
+
+                self.layout = wx.BoxSizer(wx.HORIZONTAL)
+
+                formats = ['ASCII', 'HEX', 'DEC', 'BIN']
+                self.format = wx.ComboBox(parent, choices = formats)
+                self.format.SetValue(formats[0])
+                dc = wx.ClientDC(parent)
+                tsize = max((dc.GetTextExtent (c)[0] for c in formats)) 
+                self.format.SetMinSize((tsize + 50, -1))
+                self.layout.Add(self.format, 0, flag = wx.CENTER | wx.TOP | wx.EXPAND | wx.LEFT, border = 5)
+
+                self.liveType   = wx.CheckBox(parent, label = 'Live Typing')
+                self.layout.Add(self.liveType, 0, flag = wx.CENTER | wx.TOP | wx.RIGHT | wx.EXPAND, border = 5)
+
+                self.textLine   = wx.TextCtrl(parent)
+                self.layout.Add(self.textLine, 1, flag = wx.CENTER | wx.TOP | wx.RIGHT | wx.EXPAND, border = 5)
+                 
+                self.terminator = []
+                self.terminator.append(wx.CheckBox(parent, label = 'CR'))
+                self.terminator.append(wx.CheckBox(parent, label = 'CR'))
+                self.terminator.append(wx.CheckBox(parent, label = 'LF'))
+                self.terminator.append(wx.CheckBox(parent, label = 'LF'))
+                for i in range(len(self.terminator)):
+                    self.layout.Add(self.terminator[i], 0, flag = wx.CENTER | wx.TOP | wx.EXPAND, border = 5)
+                    
+                self.send = wx.Button(parent, id = wx.ID_ANY, label = "Send")
+                self.layout.Add(self.send, 0, flag = wx.CENTER | wx.TOP | wx.EXPAND | wx.LEFT, border = 5)
+        self.sender = Sender(self)
+        outputSizer.Add(self.sender.layout, 0, flag = wx.CENTER | wx.EXPAND)
         
         # Serial Output Area
         ## Output Type
